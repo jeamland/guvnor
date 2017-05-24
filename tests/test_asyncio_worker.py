@@ -169,35 +169,6 @@ def test_worker_creates_servers_for_sockets(monkeypatch):
         assert call[1]['sock'] in sockets
 
 
-def test_worker_new_connection_creates_new_task(monkeypatch, mock):
-    loop = asyncio.get_event_loop()
-    calls = []
-
-    sock = StubSocket()
-    sock.accept = lambda: sock
-
-    age = None
-    ppid = os.getpid()
-    sockets = [sock]
-    app = None
-    timeout = None
-    cfg = Config()
-    log = None
-
-    selector = StubSelector()
-    reader = events.Handle(lambda: None, [], loop)
-    writer = events.Handle(lambda: None, [], loop)
-    monkeypatch.setattr(loop, '_selector', selector)
-    loop.call_later(1, lambda: selector.make_ready(sock.fileno(), selectors.EVENT_READ, (reader, writer)))
-
-    worker = AsyncioWorker(age, ppid, sockets, app, timeout, cfg, log)
-    connection_task = mock.MagicMock()
-    monkeypatch.setattr(worker, 'connection_task', connection_task)
-    run_worker(worker)
-
-    connection_task.assert_called()
-
-
 def test_worker_passes_request_to_app():
     loop = asyncio.get_event_loop()
 
