@@ -1,0 +1,88 @@
+How to write a gunicorn worker
+------------------------------
+
+The base code of a gunicorn worker is in gunicorn.worker.base.Worker. You
+can get gunicorn to use your own worker by running it like so:
+
+    $ gunicorn -k myworker.MyWorker myapp:app
+
+But here's what happens:
+
+[2017-05-23 11:28:10 -0700] [61993] [INFO] Starting gunicorn 19.7.1
+[2017-05-23 11:28:10 -0700] [61993] [INFO] Listening at: http://127.0.0.1:8000 (61993)
+[2017-05-23 11:28:10 -0700] [61993] [INFO] Using worker: guvnor.asyncio_worker.AsyncioWorker
+[2017-05-23 11:28:10 -0700] [61996] [INFO] Booting worker with pid: 61996
+[2017-05-23 11:28:11 -0700] [61996] [ERROR] Exception in worker process
+Traceback (most recent call last):
+  File "/Users/riceb2/.local/share/virtualenvs/guvnor-iF69-5_x/lib/python3.6/site-packages/gunicorn/arbiter.py", line 578, in spawn_worker
+    worker.init_process()
+  File "/Users/riceb2/.local/share/virtualenvs/guvnor-iF69-5_x/lib/python3.6/site-packages/gunicorn/workers/base.py", line 131, in init_process
+    self.run()
+  File "/Users/riceb2/.local/share/virtualenvs/guvnor-iF69-5_x/lib/python3.6/site-packages/gunicorn/workers/base.py", line 76, in run
+    raise NotImplementedError()
+NotImplementedError
+[2017-05-23 11:28:11 -0700] [61996] [INFO] Worker exiting (pid: 61996)
+
+Which is because the base worker class doesn't implement its run method. So let's work out how that should look.
+
+Life cycle of a worker:
+- __init__
+- init_process
+- run
+- (death)
+
+Worker has:
+- age
+- ppid (master PID)
+- sockets
+- app (the app itself, assumed WSGI?)
+- timeout
+- cfg (from app)
+- log
+
+gunicorn startup:
+How does gunicorn start up? We can look in setup.py:
+
+    entry_points="""
+    [console_scripts]
+    gunicorn=gunicorn.app.wsgiapp:run
+    gunicorn_paster=gunicorn.app.pasterapp:run
+    [paste.server_runner]
+    main=gunicorn.app.pasterapp:paste_server
+    """
+
+So when we run gunicorn we invoke the run function in gunicorn.app.wsgiapp. Let's look there:
+
+def run():
+    """\
+    The ``gunicorn`` command line runner for launching Gunicorn with
+    generic WSGI applications.
+    """
+    from gunicorn.app.wsgiapp import WSGIApplication
+    WSGIApplication("%(prog)s [OPTIONS] [APP_MODULE]").run()
+
+Ok, next stop WSGIApplication.run. WSGIApplication inherits its run method from gunicorn.app.base.Application:
+
+    def run(self):
+        try:
+            Arbiter(self).run()
+        except RuntimeError as e:
+            print("\nError: %s\n" % e, file=sys.stderr)
+            sys.stderr.flush()
+            sys.exit(1)
+
+So it looks like our next point of interest is Arbiter. If we look in Arbiter.run we can see it calls a bunch of worker-related methods on itself, but the one of interest to is is manage_workers which calls spawn_workers which calls spawn_worker:
+
+        worker = self.worker_class(self.worker_age, self.pid, self.LISTENERS,
+                                   self.app, self.timeout / 2.0,
+                                   self.cfg, self.log)
+
+So let's decode all these parameters.
+
+- age (passed in as self.worker_age from Arbiter) is how many workers have been created during the lifetime of this Arbiter.
+- ppid (passed in as self.pid from Arbiter) is the PID of our parent (Arbiter) process.
+- sockets (passed in as self.LISTENERS from Arbiter) is a list of sockets we should be accepting new connections form
+- app (passed in as self.app from Arbiter) is the application object itself.
+- timeout (passed as self.timeout / 2.0 from Arbiter) is the length of time a worker can be unresponsive before the parent will clean it up
+- cfg (passed in as self.cfg from Arbiter) is the configuration object (see gunicorn.config.Config) that was generated from the provided configuration file/options at startup.
+- log (passed in as self.log from Arbiter) is the logging object being used for gunicorn logs.
