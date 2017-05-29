@@ -172,6 +172,7 @@ def test_worker_passes_request_to_app():
     timeout = None
     cfg = Config()
     log = None
+    sockname = ('127.0.0.1', '80')
 
     reader = asyncio.StreamReader()
     writer = StubWriter()
@@ -181,7 +182,7 @@ def test_worker_passes_request_to_app():
         reader.feed_eof()
 
     worker = AsyncioWorker(age, ppid, sockets, app, timeout, cfg, log)
-    loop.create_task(worker.connection_task(reader, writer))
+    loop.create_task(worker.connection_task(sockname, reader, writer))
     loop.call_soon(feeder)
     run_worker(worker)
 
@@ -204,6 +205,7 @@ def test_worker_returns_response_to_socket():
     timeout = None
     cfg = Config()
     log = None
+    sockname = ('127.0.0.1', '80')
 
     reader = asyncio.StreamReader()
     writer = StubWriter()
@@ -213,7 +215,7 @@ def test_worker_returns_response_to_socket():
         reader.feed_eof()
 
     worker = AsyncioWorker(age, ppid, sockets, app, timeout, cfg, log)
-    loop.create_task(worker.connection_task(reader, writer))
+    loop.create_task(worker.connection_task(sockname, reader, writer))
     loop.call_soon(feeder)
     run_worker(worker)
 

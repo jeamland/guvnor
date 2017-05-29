@@ -6,10 +6,12 @@ from gunicorn.workers.base import Worker
 import h11
 
 
-def environ_from_request(cfg, req):
+def environ_from_request(cfg, req, sockname):
     environ = base_environ(cfg)
     environ.update({
         'REQUEST_METHOD': req.method,
+        'SERVER_NAME': sockname[0],
+        'SERVER_PORT': str(sockname[1]),
         'SERVER_PROTOCOL': b'HTTP/%s' % req.http_version,
     })
 
@@ -48,6 +50,7 @@ class AsyncioWorker(Worker):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.servers = []
+        self.sockname = None
 
     def run(self):
         loop = asyncio.get_event_loop()
@@ -60,11 +63,21 @@ class AsyncioWorker(Worker):
     async def create_servers(self):
         for sock in self.sockets:
             print(repr(sock))
-            server = await asyncio.start_server(self.connection_task, sock=sock)
+
+            def task_factory(sock):
+                sockname = sock.getsockname()
+
+                async def _inner(reader, writer):
+                    await self.connection_task(sockname, reader, writer)
+
+                return _inner
+
+            server = await asyncio.start_server(task_factory(sock), sock=sock)
             self.servers.append(server)
 
-    async def connection_task(self, reader, writer):
-        print(repr(reader), repr(writer))
+    async def connection_task(self, sockname, reader, writer):
+        print(repr(sockname))
+
         conn = h11.Connection(h11.SERVER)
         event = h11.NEED_DATA
 
@@ -85,7 +98,7 @@ class AsyncioWorker(Worker):
         print(repr(event))
 
         if isinstance(event, h11.Request):
-            environ = environ_from_request(self.cfg, event)
+            environ = environ_from_request(self.cfg, event, sockname)
             app = self.app.wsgi()
 
             def write(stuff):
