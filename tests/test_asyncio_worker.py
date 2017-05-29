@@ -3,6 +3,7 @@ from asyncio import selectors, events
 from collections import namedtuple
 import socket
 import os
+import wsgiref.validate
 
 import pytest
 
@@ -122,7 +123,7 @@ class StubSelector(selectors.BaseSelector):
 
 def make_stub_application(status=None, headers=None, body=None, exc_info=None):
     wsgi = StubWSGI(status, headers, body, exc_info)
-    return wsgi, StubApplication(wsgi)
+    return wsgi, StubApplication(wsgiref.validate.validator(wsgi))
 
 
 def run_worker(worker):
