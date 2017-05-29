@@ -15,6 +15,7 @@ def ensure_loop_stopped():
     loop = asyncio.get_event_loop()
     try:
         loop.stop()
+        loop.close()
     except:
         pass
 
