@@ -54,6 +54,9 @@ class AsyncioWorker(Worker):
         loop.create_task(self.create_servers())
         loop.run_forever()
 
+    def cleanup(self):
+        self.tmp.close()
+
     async def create_servers(self):
         for sock in self.sockets:
             print(repr(sock))
