@@ -40,9 +40,6 @@ class StubWSGI(object):
         self.called = False
 
     def __call__(self, environ, start_response):
-        print(repr(environ))
-        print(repr(start_response))
-
         self.called = True
         self.environ = environ
         self.start_response = start_response
