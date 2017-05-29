@@ -12,10 +12,10 @@ import h11
 def environ_from_request(cfg, req, sockname, body):
     environ = base_environ(cfg)
     environ.update({
-        'REQUEST_METHOD': req.method,
+        'REQUEST_METHOD': req.method.decode('ascii'),
         'SERVER_NAME': sockname[0],
         'SERVER_PORT': str(sockname[1]),
-        'SERVER_PROTOCOL': b'HTTP/%s' % req.http_version,
+        'SERVER_PROTOCOL': 'HTTP/%s' % req.http_version.decode('ascii'),
 
         'wsgi.input': io.BytesIO(body),
     })
@@ -23,12 +23,12 @@ def environ_from_request(cfg, req, sockname, body):
     for k, v in req.headers:
         print(repr(k), repr(v))
         if k == b'host':
-            environ['HOST'] = v
+            environ['HOST'] = v.decode('ascii')
 
-        key = 'HTTP_' + k.decode('ascii').replace('-', '_')
+        key = 'HTTP_' + k.decode('ascii').upper().replace('-', '_')
         if key in environ:
-            v = "%s,%s" % (environ[key], v)
-        environ[key] = v
+            v = "%s,%s" % (environ[key], v.decode('ascii'))
+        environ[key] = v.decode('ascii')
 
     return environ
 
