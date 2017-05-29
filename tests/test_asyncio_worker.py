@@ -93,6 +93,9 @@ class StubWriter(object):
     def drain(self):
         pass
 
+    def close(self):
+        pass
+
 
 class StubSelector(selectors.BaseSelector):
     key_type = namedtuple('key', ['fileobj', 'data'])
