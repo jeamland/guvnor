@@ -81,15 +81,6 @@ class StubSocket(object):
         return 99
 
 
-class StubReader(object):
-    def __init__(self, data=b''):
-        self.data = data
-
-    @asyncio.coroutine
-    def read(self):
-        return self.data
-
-
 class StubWriter(object):
     def __init__(self):
         self.data = b''
@@ -137,6 +128,7 @@ def make_stub_application(status=None, headers=None, body=None, exc_info=None):
 def run_worker(worker):
     asyncio.get_event_loop().call_later(0.2, ensure_loop_stopped)
     worker.run()
+    worker.cleanup()
 
 
 def test_worker_creates_servers_for_sockets(monkeypatch):
@@ -180,15 +172,16 @@ def test_worker_passes_request_to_app():
     cfg = Config()
     log = None
 
-    @asyncio.coroutine
-    def read(*args, **kwargs):
-        return request
-
-    reader = StubReader(request)
+    reader = asyncio.StreamReader()
     writer = StubWriter()
+
+    def feeder():
+        reader.feed_data(request)
+        reader.feed_eof()
 
     worker = AsyncioWorker(age, ppid, sockets, app, timeout, cfg, log)
     loop.create_task(worker.connection_task(reader, writer))
+    loop.call_soon(feeder)
     run_worker(worker)
 
     assert wsgi.called
@@ -211,19 +204,16 @@ def test_worker_returns_response_to_socket():
     cfg = Config()
     log = None
 
-    @asyncio.coroutine
-    def read(*args, **kwargs):
-        return request
-
-    @asyncio.coroutine
-    def write(data):
-        response += data
-
-    reader = StubReader(request)
+    reader = asyncio.StreamReader()
     writer = StubWriter()
+
+    def feeder():
+        reader.feed_data(request)
+        reader.feed_eof()
 
     worker = AsyncioWorker(age, ppid, sockets, app, timeout, cfg, log)
     loop.create_task(worker.connection_task(reader, writer))
+    loop.call_soon(feeder)
     run_worker(worker)
 
     assert wsgi.called
