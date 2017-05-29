@@ -1,6 +1,7 @@
 import asyncio
 import io
 from itertools import count
+import os
 from wsgiref.handlers import format_date_time
 
 from gunicorn.http.wsgi import base_environ
@@ -12,12 +13,15 @@ import h11
 def environ_from_request(cfg, req, sockname, body):
     environ = base_environ(cfg)
     environ.update({
+        'PATH_INFO': req.target.decode('utf8'),
         'REQUEST_METHOD': req.method.decode('ascii'),
+        'SCRIPT_NAME': os.environ.get('SCRIPT_NAME', ''),
         'SERVER_NAME': sockname[0],
         'SERVER_PORT': str(sockname[1]),
         'SERVER_PROTOCOL': 'HTTP/%s' % req.http_version.decode('ascii'),
 
         'wsgi.input': io.BytesIO(body),
+        'wsgi.url_scheme': 'https' if cfg.is_ssl else 'http',
     })
 
     for k, v in req.headers:
