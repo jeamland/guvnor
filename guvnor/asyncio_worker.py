@@ -11,9 +11,18 @@ import h11
 
 
 def environ_from_request(cfg, req, sockname, body):
+    target = req.target
+    fragment = None
+    query = None
+    if b'#' in target:
+        target, fragment = target.split(b'#', 1)[1]
+    if b'?' in target:
+        target, query = target.split(b'?', 1)[1]
+
     environ = base_environ(cfg)
     environ.update({
-        'PATH_INFO': req.target.decode('utf8'),
+        'PATH_INFO': target.decode('utf8'),
+        'QUERY_STRING': query.decode('utf8') if query else '',
         'REQUEST_METHOD': req.method.decode('ascii'),
         'SCRIPT_NAME': os.environ.get('SCRIPT_NAME', ''),
         'SERVER_NAME': sockname[0],
