@@ -97,33 +97,6 @@ class StubWriter(object):
         pass
 
 
-class StubSelector(selectors.BaseSelector):
-    key_type = namedtuple('key', ['fileobj', 'data'])
-
-    def __init__(self):
-        self.keys = {}
-        self.ready = []
-
-    def register(self, fileobj, events, data=None):
-        key = selectors.SelectorKey(fileobj, 0, events, data)
-        self.keys[fileobj] = key
-        return key
-
-    def unregister(self, fileobj):
-        return self.keys.pop(fileobj)
-
-    def select(self, timeout):
-        ready = self.ready
-        self.ready = []
-        return ready
-
-    def get_map(self):
-        return self.keys
-
-    def make_ready(self, fileobj, mask, data):
-        self.ready.append((self.key_type(fileobj, data), mask))
-
-
 def make_stub_application(status=None, headers=None, body=None, exc_info=None):
     wsgi = StubWSGI(status, headers, body, exc_info)
     return wsgi, StubApplication(wsgiref.validate.validator(wsgi))
