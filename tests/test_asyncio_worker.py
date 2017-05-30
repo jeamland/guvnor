@@ -141,68 +141,63 @@ def test_worker_creates_servers_for_sockets(monkeypatch):
         assert call[1]['sock'] in sockets
 
 
-def test_worker_passes_request_to_app():
-    loop = asyncio.get_event_loop()
+class WSGITestRunner:
+    def __init__(self, request, response_headers=None,
+                 response_body=None):
+        self.request = request
+        self.response_headers = response_headers
+        self.response_body = response_body
 
+        self.wsgi = None
+        self.writer = StubWriter()
+
+    def run(self):
+        loop = asyncio.get_event_loop()
+
+        age = None
+        ppid = os.getpid()
+        sockets = []
+        self.wsgi, app = make_stub_application(headers=self.response_headers,
+                                               body=self.response_body)
+        timeout = None
+        cfg = Config()
+        log = None
+        sockname = ('127.0.0.1', '80')
+
+        reader = asyncio.StreamReader()
+
+        def feeder():
+            reader.feed_data(self.request)
+            reader.feed_eof()
+
+        worker = AsyncioWorker(age, ppid, sockets, app, timeout, cfg, log)
+        loop.create_task(worker.connection_task(sockname, reader, self.writer))
+        loop.call_soon(feeder)
+        run_worker(worker)
+
+
+def test_worker_passes_request_to_app():
     request = b'GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n'
 
-    age = None
-    ppid = os.getpid()
-    sockets = []
-    wsgi, app = make_stub_application()
-    timeout = None
-    cfg = Config()
-    log = None
-    sockname = ('127.0.0.1', '80')
+    runner = WSGITestRunner(request)
+    runner.run()
 
-    reader = asyncio.StreamReader()
-    writer = StubWriter()
-
-    def feeder():
-        reader.feed_data(request)
-        reader.feed_eof()
-
-    worker = AsyncioWorker(age, ppid, sockets, app, timeout, cfg, log)
-    loop.create_task(worker.connection_task(sockname, reader, writer))
-    loop.call_soon(feeder)
-    run_worker(worker)
-
-    assert wsgi.called
-    assert wsgi.environ['REQUEST_METHOD'] == 'GET'
-    assert wsgi.environ['SERVER_PROTOCOL'] == 'HTTP/1.1'
-    assert wsgi.environ['HOST'] == 'localhost'
+    assert runner.wsgi.called
+    assert runner.wsgi.environ['REQUEST_METHOD'] == 'GET'
+    assert runner.wsgi.environ['SERVER_PROTOCOL'] == 'HTTP/1.1'
+    assert runner.wsgi.environ['HOST'] == 'localhost'
 
 
 def test_worker_returns_response_to_socket():
-    loop = asyncio.get_event_loop()
-
     request = b'GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n'
     response_body = b'hello'
 
-    age = None
-    ppid = os.getpid()
-    sockets = []
-    wsgi, app = make_stub_application(body=[response_body], headers=[
+    runner = WSGITestRunner(request, response_headers=[
         ('Content-Type', 'text/plain'),
-    ])
-    timeout = None
-    cfg = Config()
-    log = None
-    sockname = ('127.0.0.1', '80')
+    ], response_body=[response_body])
+    runner.run()
 
-    reader = asyncio.StreamReader()
-    writer = StubWriter()
-
-    def feeder():
-        reader.feed_data(request)
-        reader.feed_eof()
-
-    worker = AsyncioWorker(age, ppid, sockets, app, timeout, cfg, log)
-    loop.create_task(worker.connection_task(sockname, reader, writer))
-    loop.call_soon(feeder)
-    run_worker(worker)
-
-    assert wsgi.called
-    print(repr(writer.data))
-    assert b'200' in writer.data
-    assert response_body in writer.data
+    assert runner.wsgi.called
+    print(repr(runner.writer.data))
+    assert b'200' in runner.writer.data
+    assert response_body in runner.writer.data
