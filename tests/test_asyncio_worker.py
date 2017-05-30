@@ -30,7 +30,7 @@ def teardown_function(function):
 class StubWSGI(object):
     def __init__(self, status=None, headers=None, body=None, exc_info=None,
                  use_write=False):
-        self.status = status or '200 OK'
+        self.status = status
         self.headers = headers or []
         self.body = body
         self.exc_info = exc_info
@@ -39,6 +39,12 @@ class StubWSGI(object):
         self.environ = None
         self.start_response = None
         self.called = False
+
+        if self.status is None:
+            if self.body:
+                self.status = '200 OK'
+            else:
+                self.status = '204 No Content'
 
     def __call__(self, environ, start_response):
         self.called = True
@@ -177,7 +183,9 @@ def test_worker_returns_response_to_socket():
     age = None
     ppid = os.getpid()
     sockets = []
-    wsgi, app = make_stub_application(body=response_body)
+    wsgi, app = make_stub_application(body=[response_body], headers=[
+        ('Content-Type', 'text/plain'),
+    ])
     timeout = None
     cfg = Config()
     log = None
