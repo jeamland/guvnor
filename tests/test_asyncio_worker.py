@@ -51,14 +51,13 @@ class StubWSGI(object):
         self.environ = environ
         self.start_response = start_response
 
-
         writer = start_response(self.status, self.headers, self.exc_info)
         if self.use_write and self.body is not None:
             if self.body is not None:
                 for chunk in self.body:
                     writer(chunk)
         else:
-            return self.body or []
+            return self.body or b''
 
 
 class StubApplication(object):

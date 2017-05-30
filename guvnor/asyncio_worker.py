@@ -37,22 +37,43 @@ def environ_from_request(cfg, req, sockname, body):
     return environ
 
 
-class StartResponse(object):
-    def __init__(self, writer):
-        self.writer = writer
+class WSGIResponse:
+    def __init__(self, http, app, environ):
+        self.http = http
+        self.app = app
+        self.environ = environ
 
         self.status = None
         self.reason = None
         self.headers = []
         self.exc_info = None
 
-    def __call__(self, status, headers, exc_info=None):
+        self.buffer = []
+
+    async def process_request(self):
+        result = self.app(self.environ, self.start_response)
+        if result is not None:
+            self.buffer.extend(result)
+
+        res = h11.Response(
+            status_code=self.status,
+            reason=self.reason,
+            headers=self.headers,
+        )
+
+        await self.http.send(res)
+        for data in self.buffer:
+            await self.http.send(h11.Data(data=data))
+        await self.http.send(h11.EndOfMessage())
+
+    def start_response(self, status, headers, exc_info=None):
         status, reason = status.split(' ', 1)
         self.status = int(status)
         self.reason = reason
         self.exc_info = exc_info
+        self.headers.extend(headers)
 
-        return self.writer
+        return lambda data: self.buffer.append(data)
 
 
 class HTTPConnection:
@@ -184,20 +205,8 @@ class AsyncioWorker(Worker):
         environ = environ_from_request(self.cfg, req, sockname, body)
         app = self.app.wsgi()
 
-        def write(stuff):
-            pass
-        wsgi_response = StartResponse(write)
-
-        result = app(environ, wsgi_response)
-        res = h11.Response(
-            status_code=wsgi_response.status,
-            reason=wsgi_response.reason,
-            headers=wsgi_response.headers,
-        )
-
-        await http.send(res)
-        await http.send(h11.Data(data=body))
-        await http.send(h11.EndOfMessage())
+        wsgi_response = WSGIResponse(http, app, environ)
+        await wsgi_response.process_request()
 
     async def connection_task(self, sockname, reader, writer):
         print(repr(sockname))
