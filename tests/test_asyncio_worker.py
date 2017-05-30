@@ -168,9 +168,9 @@ def test_worker_passes_request_to_app():
     run_worker(worker)
 
     assert wsgi.called
-    assert wsgi.environ['REQUEST_METHOD'] == b'GET'
-    assert wsgi.environ['SERVER_PROTOCOL'] == b'HTTP/1.1'
-    assert wsgi.environ['HOST'] == b'localhost'
+    assert wsgi.environ['REQUEST_METHOD'] == 'GET'
+    assert wsgi.environ['SERVER_PROTOCOL'] == 'HTTP/1.1'
+    assert wsgi.environ['HOST'] == 'localhost'
 
 
 def test_worker_returns_response_to_socket():
