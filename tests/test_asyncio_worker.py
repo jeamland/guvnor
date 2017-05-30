@@ -68,25 +68,6 @@ class StubApplication(object):
         return self.app
 
 
-class StubSocket(object):
-    type = socket.SOCK_STREAM
-
-    def __init__(self):
-        self.listening = False
-        self.backlog = None
-        self.blocking = True
-
-    def listen(self, backlog=None):
-        self.listening = True
-        self.backlog = backlog
-
-    def setblocking(self, blocking):
-        self.blocking = blocking
-
-    def fileno(self):
-        return 99
-
-
 class StubWriter(object):
     def __init__(self):
         self.data = b''
@@ -113,15 +94,13 @@ def run_worker(worker):
     worker.cleanup()
 
 
-def test_worker_creates_servers_for_sockets(monkeypatch):
+def test_worker_creates_servers_for_sockets(monkeypatch, mocker):
     loop = asyncio.get_event_loop()
     calls = []
 
-    sock = StubSocket()
-
     age = None
     ppid = os.getpid()
-    sockets = [sock]
+    sockets = [mocker.MagicMock(), mocker.MagicMock()]
     app = None
     timeout = None
     cfg = Config()
