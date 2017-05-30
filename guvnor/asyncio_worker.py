@@ -2,6 +2,7 @@ import asyncio
 import io
 from itertools import count
 import os
+import urllib.parse
 from wsgiref.handlers import format_date_time
 
 from gunicorn.http.wsgi import base_environ
@@ -14,10 +15,12 @@ def environ_from_request(cfg, req, sockname, body):
     target = req.target
     fragment = None
     query = None
+    target = urllib.parse.unquote_to_bytes(target)
     if b'#' in target:
-        target, fragment = target.split(b'#', 1)[1]
+        target, fragment = target.split(b'#', 1)
     if b'?' in target:
-        target, query = target.split(b'?', 1)[1]
+        print(repr(target))
+        target, query = target.split(b'?', 1)
 
     environ = base_environ(cfg)
     environ.update({
