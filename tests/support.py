@@ -1,11 +1,6 @@
 import asyncio
-from asyncio import selectors, events
-from collections import namedtuple
-import socket
 import os
 import wsgiref.validate
-
-import pytest
 
 from gunicorn.config import Config
 
